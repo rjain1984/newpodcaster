@@ -4,8 +4,8 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from datetime import datetime, timezone
-from typing import Iterable
+from collections.abc import Iterable
+from datetime import UTC, datetime
 
 import boto3
 from botocore.exceptions import ClientError
@@ -61,7 +61,7 @@ def save_episode(article: Article, audio: bytes) -> Episode:
         "url": article["url"],
         "title": article["title"],
         "source": article["source"],
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "audio_key": audio_key,
     }
     existing = _get_json(EPISODES_KEY, default=[])

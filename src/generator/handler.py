@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from generator.config import load_config
 from generator.dialog import generate_dialog
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def handler(event, context) -> dict:
     cfg = load_config()
     seen = load_seen_urls()
-    candidates = discover(now=datetime.now(timezone.utc), seen_urls=seen)
+    candidates = discover(now=datetime.now(UTC), seen_urls=seen)
     logger.info("discovered %d candidates", len(candidates))
 
     generated = 0

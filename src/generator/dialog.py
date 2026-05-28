@@ -11,13 +11,17 @@ from generator.types import Article, Turn
 
 MODEL = "gemini-2.5-flash"
 
-SYSTEM_PROMPT = """You are a script writer for a short news podcast.
-Two hosts named Alex (host_a) and Sam (host_b) chat about a single news article.
-Tone: conversational, curious, light. Avoid jargon. Keep it accurate to the article — never invent facts.
-Output strictly a JSON array of objects, each with `speaker` (either "host_a" or "host_b") and `text`.
-Aim for ~1 minute of audio per 300 words of source. Most turns are 1-3 sentences.
-Start with a short hook, then conversational back-and-forth, end with a one-line sign-off.
-Do not include any prose outside the JSON array."""
+SYSTEM_PROMPT = (
+    "You are a script writer for a short news podcast.\n"
+    "Two hosts named Alex (host_a) and Sam (host_b) chat about a single news article.\n"
+    "Tone: conversational, curious, light. Avoid jargon. "
+    "Keep it accurate to the article — never invent facts.\n"
+    'Output strictly a JSON array of objects, each with `speaker` '
+    '(either "host_a" or "host_b") and `text`.\n'
+    "Aim for ~1 minute of audio per 300 words of source. Most turns are 1-3 sentences.\n"
+    "Start with a short hook, then conversational back-and-forth, end with a one-line sign-off.\n"
+    "Do not include any prose outside the JSON array."
+)
 
 
 class DialogError(RuntimeError):

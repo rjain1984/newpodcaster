@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -34,7 +34,7 @@ def _entry(url, title, pub):
 
 @pytest.fixture
 def now():
-    return datetime(2026, 5, 28, 16, 0, tzinfo=timezone.utc)  # 09:00 PDT
+    return datetime(2026, 5, 28, 16, 0, tzinfo=UTC)  # 09:00 PDT
 
 
 def test_discover_returns_candidates_inside_window(now):

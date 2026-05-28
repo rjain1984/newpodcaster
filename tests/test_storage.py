@@ -1,11 +1,9 @@
 import json
-from datetime import datetime, timezone
 
 import boto3
 
 from generator.storage import (
     EPISODES_KEY,
-    SEEN_URLS_KEY,
     get_audio_url,
     list_episodes,
     load_seen_urls,

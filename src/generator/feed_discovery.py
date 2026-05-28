@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 
 import feedparser
@@ -63,7 +63,7 @@ def _fetch_and_filter(
             try:
                 pub_dt = parsedate_to_datetime(pub_raw)
                 if pub_dt.tzinfo is None:
-                    pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+                    pub_dt = pub_dt.replace(tzinfo=UTC)
             except (TypeError, ValueError):
                 continue
             if pub_dt < cutoff:
@@ -75,7 +75,7 @@ def _fetch_and_filter(
                 Candidate(
                     url=url,
                     title=title,
-                    pub_date=pub_dt.astimezone(timezone.utc).isoformat(),
+                    pub_date=pub_dt.astimezone(UTC).isoformat(),
                     source_feed=feed_url,
                 )
             )

@@ -32,7 +32,7 @@ def extract_article(url: str) -> Article:
     metadata = trafilatura.extract_metadata(html)
     title = (metadata.title if metadata and metadata.title else "Untitled").strip()
     host = urlparse(url).hostname or ""
-    source = host.lstrip("www.")
+    source = host.removeprefix("www.")
 
     return Article(url=url, title=title, body=body, source=source)
 

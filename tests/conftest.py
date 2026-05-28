@@ -1,5 +1,4 @@
 """Shared pytest fixtures."""
-import os
 
 import boto3
 import pytest
