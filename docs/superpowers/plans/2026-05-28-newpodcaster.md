@@ -2173,7 +2173,26 @@ git commit -m "docs(rollout): record first successful scheduled run"
 
 ## Feed verification results
 
-_(Filled in by Task 1.)_
+Verified on 2026-05-28. All curls run from macOS (zsh) against `feeds.bbci.co.uk`.
+
+| URL | HTTP status | Notes |
+|---|---|---|
+| `https://feeds.bbci.co.uk/sport/football/rss.xml` | 200 | Valid RSS 2.0, well-formed |
+| `https://feeds.bbci.co.uk/sport/football/premier-league/rss.xml` | 200 | Valid RSS 2.0, well-formed |
+| `https://feeds.bbci.co.uk/sport/football/european/rss.xml` | 200 | Valid RSS 2.0, well-formed — used as `bbc_european.rss` fixture |
+| `https://feeds.bbci.co.uk/sport/football/world_cup/rss.xml` | **404** | BBC removed this feed; replaced (see below) |
+| `https://feeds.bbci.co.uk/sport/football/teams/arsenal/rss.xml` | 200 | Valid RSS 2.0, well-formed — used as `bbc_arsenal.rss` fixture |
+
+**Replacement for `world_cup` (404):** Tried alternate slugs:
+- `https://feeds.bbci.co.uk/sport/football/champions-league/rss.xml` → **200** (valid RSS, 20+ items)
+- `https://feeds.bbci.co.uk/sport/football/europa-league/rss.xml` → **200** (valid RSS, 20+ items)
+
+**Chosen alternative:** Replace `world_cup` with `champions-league` in `WIDE_FEEDS` in `src/generator/feed_discovery.py`. Champions League is the most prominent European club competition, aligns with the project's European football focus, and BBC actively maintains the feed. The `europa-league` feed is available as a fallback if needed.
+
+**Fixture files saved:**
+- `tests/fixtures/bbc_european.rss` — live content fetched 2026-05-28 (17 KB)
+- `tests/fixtures/bbc_arsenal.rss` — live content fetched 2026-05-28 (14 KB)
+- `tests/fixtures/bbc_article.html` — synthetic fixture based on real article metadata from the european feed (article: "How much prize money have Premier League teams earned in Europe?", URL: `https://www.bbc.com/sport/football/articles/c3d2yd99pn8o`). The BBC article HTML could not be fetched directly (Claude Code network policy blocks `www.bbc.com`), so a semantically equivalent HTML document was constructed with >200 chars of extractable body text sufficient for the `trafilatura` extractor test.
 
 ## Production rollout
 
