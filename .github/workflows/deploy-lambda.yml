@@ -1,0 +1,54 @@
+name: Deploy Lambda
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'template.yaml'
+      - '.github/workflows/deploy-lambda.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write   # for AWS OIDC (optional; falls back to access keys)
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: SAM validate
+        run: sam validate --template template.yaml
+
+      - name: SAM build
+        run: sam build --template template.yaml
+
+      - name: SAM deploy
+        run: |
+          sam deploy \
+            --stack-name newpodcaster \
+            --region us-west-2 \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --resolve-s3 \
+            --parameter-overrides \
+              S3BucketName=rjain-newpodcaster \
+              GeminiSecretName=newpodcaster/gemini_api_key
