@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: newpodcaster — daily BBC football podcast generator
+
+Parameters:
+  S3BucketName:
+    Type: String
+    Description: S3 bucket for audio + index (must exist before deploy)
+  GeminiSecretName:
+    Type: String
+    Default: newpodcaster/gemini_api_key
+    Description: Secrets Manager entry holding the Gemini API key
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 300        # 5 minutes
+    MemorySize: 1024
+    Architectures:
+      - arm64
+
+Resources:
+  GeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: newpodcaster-generator
+      CodeUri: src/
+      Handler: generator.handler.handler
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref S3BucketName
+          GEMINI_SECRET_NAME: !Ref GeminiSecretName
+          LOG_LEVEL: INFO
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:ListBucket
+              Resource:
+                - !Sub arn:aws:s3:::${S3BucketName}
+                - !Sub arn:aws:s3:::${S3BucketName}/*
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GeminiSecretName}*
+      Events:
+        DailyCron:
+          Type: Schedule
+          Properties:
+            # 16:00 UTC = 09:00 PDT (May–Nov) / 08:00 PST (Nov–Mar). Acceptable drift for a personal tool.
+            Schedule: cron(0 16 * * ? *)
+            Description: Daily newpodcaster generator run
+            Enabled: true
+
+Outputs:
+  FunctionName:
+    Value: !Ref GeneratorFunction
+  FunctionArn:
+    Value: !GetAtt GeneratorFunction.Arn
