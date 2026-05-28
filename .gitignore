@@ -28,3 +28,7 @@ dist/
 tmp/
 *.wav
 *.mp3
+
+# SAM
+samconfig.toml
+.aws-sam/

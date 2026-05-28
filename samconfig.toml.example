@@ -1,0 +1,12 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "newpodcaster"
+region = "us-west-2"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+resolve_s3 = true
+parameter_overrides = "S3BucketName=rjain-newpodcaster GeminiSecretName=newpodcaster/gemini_api_key"
+
+[default.global.parameters]
+stack_name = "newpodcaster"
