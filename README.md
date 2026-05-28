@@ -2,7 +2,7 @@
 
 A daily AI podcast of BBC Sport football news. Personal project — single user.
 
-Each morning at 09:00 PT, an AWS Lambda discovers new BBC Sport football articles (European + World Cup; falls back to Premier League + Arsenal when news is heavy), turns each into a two-host NotebookLM-style podcast, and stores the audio on S3. A Streamlit web app on Community Cloud lets me listen on my phone. Capped at 5 episodes per day to stay inside free-tier AI quotas.
+Each morning at 09:00 PT, an AWS Lambda discovers new BBC Sport football articles (European + Champions League; falls back to Premier League + Arsenal when news is heavy), turns each into a two-host NotebookLM-style podcast, and stores the audio on S3. A Streamlit web app on Community Cloud lets me listen on my phone. Capped at 5 episodes per day to stay inside free-tier AI quotas.
 
 ## Stack
 

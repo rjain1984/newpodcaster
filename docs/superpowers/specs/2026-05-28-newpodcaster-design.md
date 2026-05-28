@@ -5,7 +5,7 @@
 
 ## Problem
 
-I want to listen to BBC football news as a daily AI podcast. Every morning, the app should generate two-host NotebookLM-style episodes from the previous day's BBC Sport football articles (European + World Cup focus; Arsenal + Premier League fallback when news is heavy), capped at 5 episodes per day to stay inside free-tier AI quotas.
+I want to listen to BBC football news as a daily AI podcast. Every morning, the app should generate two-host NotebookLM-style episodes from the previous day's BBC Sport football articles (European + Champions League focus; Arsenal + Premier League fallback when news is heavy), capped at 5 episodes per day to stay inside free-tier AI quotas.
 
 ## Goals
 
@@ -101,7 +101,7 @@ class Candidate(TypedDict):
 
 WIDE_FEEDS = [
     "https://feeds.bbci.co.uk/sport/football/european/rss.xml",
-    "https://feeds.bbci.co.uk/sport/football/world_cup/rss.xml",
+    "https://feeds.bbci.co.uk/sport/football/champions-league/rss.xml",
 ]
 NARROW_FEEDS = [
     "https://feeds.bbci.co.uk/sport/football/premier-league/rss.xml",

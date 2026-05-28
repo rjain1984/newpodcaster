@@ -4,7 +4,7 @@
 
 **Goal:** Ship a working daily BBC-football AI podcast: a scheduled AWS Lambda discovers BBC Sport articles, generates two-host Gemini audio, stores it in S3, and a Streamlit Cloud viewer plays it.
 
-**Architecture:** Two cooperating pieces. **Generator** is an AWS Lambda triggered by EventBridge at 09:00 PT daily; it fetches BBC RSS feeds (wide net of European + World Cup, narrowing to Premier League + Arsenal when >10 articles in window), caps at 5 articles/day, calls Gemini for dialog + multi-speaker TTS, and writes audio + index files to S3. **Viewer** is a tiny Streamlit app on Streamlit Community Cloud that reads `index/episodes.json` from S3 and plays audio via presigned URLs. A password gate on the viewer keeps the public URL from being abused.
+**Architecture:** Two cooperating pieces. **Generator** is an AWS Lambda triggered by EventBridge at 09:00 PT daily; it fetches BBC RSS feeds (wide net of European + Champions League, narrowing to Premier League + Arsenal when >10 articles in window), caps at 5 articles/day, calls Gemini for dialog + multi-speaker TTS, and writes audio + index files to S3. **Viewer** is a tiny Streamlit app on Streamlit Community Cloud that reads `index/episodes.json` from S3 and plays audio via presigned URLs. A password gate on the viewer keeps the public URL from being abused.
 
 **Tech Stack:** Python 3.12, AWS Lambda + EventBridge + S3 + Secrets Manager (via AWS SAM), Streamlit Community Cloud, Google Gemini 2.5 Flash (text) + Gemini 2.5 Flash Preview TTS (multi-speaker audio), `trafilatura`, `feedparser`, `boto3`, `pytest` + `moto` for tests.
 
@@ -746,7 +746,7 @@ def test_discover_swaps_to_narrow_when_over_threshold(now):
     ]
 
     def fake_parse(url):
-        if "european" in url or "world_cup" in url:
+        if "european" in url or "champions-league" in url:
             return _fake_feedparser_parse(wide_entries)
         return _fake_feedparser_parse(narrow_entries)
 
@@ -798,7 +798,7 @@ logger = logging.getLogger(__name__)
 
 WIDE_FEEDS = [
     "https://feeds.bbci.co.uk/sport/football/european/rss.xml",
-    "https://feeds.bbci.co.uk/sport/football/world_cup/rss.xml",
+    "https://feeds.bbci.co.uk/sport/football/champions-league/rss.xml",
 ]
 NARROW_FEEDS = [
     "https://feeds.bbci.co.uk/sport/football/premier-league/rss.xml",
