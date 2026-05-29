@@ -93,10 +93,9 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
     <button class="play-btn" id="play-{i}" data-idx="{i}" aria-label="Play">▶</button>
     <span class="time" id="time-{i}">--:-- / --:--</span>
     <div class="speed-group" role="group" aria-label="Playback speed">
-      <button class="speed-btn" data-idx="{i}" data-rate="1">1×</button>
+      <button class="speed-btn active" data-idx="{i}" data-rate="1">1×</button>
       <button class="speed-btn" data-idx="{i}" data-rate="1.25">1.25×</button>
-      <button class="speed-btn active" data-idx="{i}" data-rate="1.5">1.5×</button>
-      <button class="speed-btn" data-idx="{i}" data-rate="2">2×</button>
+      <button class="speed-btn" data-idx="{i}" data-rate="1.5">1.5×</button>
     </div>
   </div>
 </div>
@@ -238,14 +237,12 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
       }}
     }});
 
-    // Default playback rate 1.5x (~4.8 wps effective)
-    ws.on('ready', () => {{ ws.setPlaybackRate(1.5, false); }});
-
-    // Wire up the speed buttons for THIS card
+    // Wire up the speed buttons for THIS card. Default rate is 1x (natural).
+    // Second arg `true` = preserve pitch (no chipmunk effect).
     document.querySelectorAll('.ep-card#ep-' + idx + ' .speed-btn').forEach((sb) => {{
       sb.addEventListener('click', () => {{
         const rate = parseFloat(sb.getAttribute('data-rate'));
-        ws.setPlaybackRate(rate, false);
+        ws.setPlaybackRate(rate, true);
         document.querySelectorAll('.ep-card#ep-' + idx + ' .speed-btn')
           .forEach((b) => b.classList.remove('active'));
         sb.classList.add('active');
