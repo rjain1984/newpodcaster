@@ -57,7 +57,6 @@ def _human_date(iso: str) -> str:
 
 
 def _infer_topic(ep: dict) -> str:
-    """Get the episode's explicit topic, or infer from URL for backward compat."""
     if ep.get("topic"):
         return ep["topic"]
     url = ep.get("url", "")
@@ -100,80 +99,100 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
     cards_html = "\n".join(cards)
     return f"""
 <style>
-  body {{ margin: 0; background: transparent; color: inherit;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }}
+  :root {{ color-scheme: dark light; }}
+  html, body {{
+    margin: 0; padding: 0;
+    background: transparent;
+    color: #FAFAFA;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }}
   .ep-card {{
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.12);
     border-radius: 10px;
     padding: 14px;
     margin-bottom: 18px;
-    background: rgba(255,255,255,0.02);
+    background: rgba(255,255,255,0.03);
   }}
   .ep-card .thumb {{
     width: 100%;
-    max-height: 240px;
-    object-fit: cover;
+    height: auto;
     border-radius: 6px;
     display: block;
     cursor: pointer;
     transition: transform 0.2s ease;
+    background: rgba(0,0,0,0.2);
   }}
-  .ep-card .thumb:hover {{ transform: scale(1.01); }}
-  .ep-card h3 {{ margin: 12px 0 4px; font-size: 1.05em; font-weight: 600; }}
-  .ep-card .meta {{ margin: 0 0 10px; font-size: 0.85em; opacity: 0.65; }}
-  .ep-card .wave {{ width: 100%; margin: 8px 0; min-height: 64px; }}
-  .ep-card .ctrl {{ display: flex; align-items: center; gap: 12px; }}
+  .ep-card .thumb:hover {{ transform: scale(1.005); }}
+  .ep-card h3 {{
+    margin: 14px 0 6px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #FAFAFA;
+    line-height: 1.35;
+  }}
+  .ep-card .meta {{
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+    color: rgba(250,250,250,0.65);
+  }}
+  .ep-card .wave {{
+    width: 100%;
+    margin: 10px 0;
+    min-height: 64px;
+  }}
+  .ep-card .ctrl {{
+    display: flex; align-items: center; gap: 14px;
+  }}
   .ep-card .play-btn {{
-    background: #FF4B4B;
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 42px;
-    height: 42px;
-    font-size: 17px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    background: #FF4B4B; color: white;
+    border: none; border-radius: 50%;
+    width: 44px; height: 44px;
+    font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }}
   .ep-card .play-btn:hover {{ background: #e63f3f; }}
-  .ep-card .time {{ font-family: monospace; font-size: 0.85em; opacity: 0.7; }}
-  .ep-card.playing {{ border-color: rgba(255,75,75,0.5); }}
+  .ep-card .time {{
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9rem;
+    color: rgba(250,250,250,0.75);
+  }}
+  .ep-card.playing {{ border-color: rgba(255,75,75,0.55); }}
+  .err {{ color: #ff8a8a; font-size: 0.85em; }}
 </style>
 <div class="tab-content">
   {cards_html}
 </div>
-<script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@7.8.6/dist/wavesurfer.min.js"></script>
-<script>
-(function() {{
-  var AUDIO_URLS = {audio_urls_js};
-  var players = [];
+<script type="module">
+  // wavesurfer.js v7 ships ESM only (no UMD bundle).
+  import WaveSurfer from 'https://cdn.jsdelivr.net/npm/wavesurfer.js@7.8.6/dist/wavesurfer.esm.js';
+
+  const AUDIO_URLS = {audio_urls_js};
+  const players = [];
 
   function fmt(s) {{
     s = Math.floor(s || 0);
-    var m = Math.floor(s / 60);
-    var sec = s % 60;
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
     return m + ':' + (sec < 10 ? '0' : '') + sec;
   }}
 
   function pauseAllExcept(idx) {{
-    players.forEach(function(p, i) {{ if (i !== idx && p) p.pause(); }});
+    players.forEach((p, i) => {{ if (i !== idx && p) p.pause(); }});
   }}
 
   function playEpisode(idx) {{
     if (idx < 0 || idx >= players.length || !players[idx]) return;
     pauseAllExcept(idx);
     players[idx].play();
-    // Scroll the playing card into view inside the iframe
-    var card = document.getElementById('ep-' + idx);
+    const card = document.getElementById('ep-' + idx);
     if (card) card.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
   }}
 
-  AUDIO_URLS.forEach(function(url, idx) {{
-    var ws = WaveSurfer.create({{
+  AUDIO_URLS.forEach((url, idx) => {{
+    const ws = WaveSurfer.create({{
       container: '#wave-' + idx,
-      waveColor: 'rgba(255,75,75,0.35)',
+      waveColor: 'rgba(255,75,75,0.40)',
       progressColor: '#FF4B4B',
       cursorColor: '#FF4B4B',
       height: 64,
@@ -182,11 +201,11 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
       barRadius: 1,
       url: url,
     }});
-    var btn = document.getElementById('play-' + idx);
-    var timeEl = document.getElementById('time-' + idx);
-    var card = document.getElementById('ep-' + idx);
+    const btn = document.getElementById('play-' + idx);
+    const timeEl = document.getElementById('time-' + idx);
+    const card = document.getElementById('ep-' + idx);
 
-    btn.addEventListener('click', function() {{
+    btn.addEventListener('click', () => {{
       if (ws.isPlaying()) {{
         ws.pause();
       }} else {{
@@ -194,39 +213,65 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
       }}
     }});
 
-    ws.on('ready', function() {{
+    ws.on('ready', () => {{
       timeEl.textContent = '0:00 / ' + fmt(ws.getDuration());
     }});
-    ws.on('play',  function() {{
+    ws.on('play',  () => {{
       btn.textContent = '⏸';
       card.classList.add('playing');
     }});
-    ws.on('pause', function() {{
+    ws.on('pause', () => {{
       btn.textContent = '▶';
       card.classList.remove('playing');
     }});
-    ws.on('finish', function() {{
+    ws.on('finish', () => {{
       btn.textContent = '▶';
       ws.setTime(0);
       card.classList.remove('playing');
-      // Auto-play the next episode after a short gap
       if (idx + 1 < players.length) {{
-        setTimeout(function() {{ playEpisode(idx + 1); }}, 600);
+        setTimeout(() => playEpisode(idx + 1), 600);
       }}
     }});
-    ws.on('timeupdate', function(t) {{
+    ws.on('timeupdate', (t) => {{
       timeEl.textContent = fmt(t) + ' / ' + fmt(ws.getDuration());
+    }});
+    ws.on('error', (e) => {{
+      timeEl.innerHTML = '<span class="err">audio load failed</span>';
+      console.error('wavesurfer error for', url, e);
     }});
 
     players.push(ws);
   }});
-}})();
 </script>
 """
 
 
+def _inject_parent_styles() -> None:
+    """Inject CSS into the Streamlit parent page to enlarge tab fonts."""
+    st.markdown(
+        """
+        <style>
+          .stTabs [data-baseweb="tab-list"] { gap: 6px; }
+          .stTabs [data-baseweb="tab-list"] button[data-baseweb="tab"] {
+            font-size: 1.15rem;
+            padding: 10px 22px;
+            height: auto;
+          }
+          .stTabs [data-baseweb="tab-list"] button[data-baseweb="tab"] p {
+            font-size: 1.15rem;
+          }
+          .stTabs [data-baseweb="tab-list"] button[data-baseweb="tab"][aria-selected="true"] {
+            font-weight: 600;
+          }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def main():
     st.set_page_config(page_title="Newpodcaster", page_icon="🎙️", layout="centered")
+    _inject_parent_styles()
     st.title("🎙️ Newpodcaster")
 
     episodes = _load_episodes()
@@ -234,7 +279,6 @@ def main():
         st.info("No episodes yet. Check back after 09:00 PT.")
         return
 
-    # Group episodes by topic
     grouped: dict[str, list[dict]] = {key: [] for key, _ in TABS}
     for ep in episodes:
         topic = _infer_topic(ep)
@@ -253,8 +297,8 @@ def main():
                 f"— newest first · auto-plays next on finish"
             )
             audio_urls = [_presigned_url(ep["audio_key"]) for ep in tab_episodes]
-            # Each card is ~460px tall; allow extra padding so nothing clips.
-            iframe_height = max(700, 480 * len(tab_episodes) + 40)
+            # ~720px per card (taller thumbnails uncropped). Generous so nothing clips.
+            iframe_height = max(800, 720 * len(tab_episodes) + 60)
             components.html(
                 _tab_html(tab_episodes, audio_urls),
                 height=iframe_height,
