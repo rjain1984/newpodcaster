@@ -17,15 +17,16 @@ logger = logging.getLogger(__name__)
 # 429s on quota, fall through to the next. The chain mixes Flash + Pro variants
 # so the buckets are genuinely separate.
 TTS_MODELS_FALLBACK = [
-    # Live API IDs all seem to use the `-preview-tts` suffix. The non-preview
-    # versions (gemini-3.1-flash-tts, gemini-2.5-flash-tts, etc.) 404'd against
-    # the user's key on 2026-05-29 — those names appear to be AI Studio display
-    # labels, not API IDs. Each entry below is a SEPARATE quota bucket.
-    "gemini-3.1-flash-preview-tts",
-    "gemini-3.1-pro-preview-tts",
-    "gemini-3.0-flash-preview-tts",
-    "gemini-2.5-pro-preview-tts",
-    "gemini-2.5-flash-preview-tts",    # confirmed working on 2026-05-29
+    # Confirmed alive against this key (CloudWatch logs, 2026-05-29).
+    # Each model is a separate daily quota bucket; chaining them roughly
+    # doubles our effective TTS RPD ceiling on the free tier.
+    "gemini-2.5-pro-preview-tts",      # confirmed: returns 429 when quota'd (real model)
+    "gemini-2.5-flash-preview-tts",    # confirmed working
+    # The following IDs all returned 404 on 2026-05-29 — kept commented as a
+    # retry candidate if Google ships them under these exact names:
+    #   "gemini-3.1-flash-preview-tts",
+    #   "gemini-3.1-pro-preview-tts",
+    #   "gemini-3.0-flash-preview-tts",
 ]
 # Backward-compat: first model is the primary
 MODEL = TTS_MODELS_FALLBACK[0]
