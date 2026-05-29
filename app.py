@@ -13,9 +13,9 @@ from botocore.exceptions import ClientError
 EPISODES_KEY = "index/episodes.json"
 PRESIGNED_URL_TTL_SECONDS = 3600
 TABS = [
-    ("football", "⚽ Football"),
-    ("f1", "🏎️ F1"),
-    ("india", "🇮🇳 India"),
+    ("football", ":material/sports_soccer: Football"),
+    ("f1", ":material/sports_motorsports: F1"),
+    ("india", ":material/temple_hindu: India"),
 ]
 
 
@@ -251,14 +251,19 @@ def _inject_parent_styles() -> None:
     st.markdown(
         """
         <style>
-          .stTabs [data-baseweb="tab-list"] { gap: 6px; }
+          .stTabs [data-baseweb="tab-list"] { gap: 8px; }
           .stTabs [data-baseweb="tab-list"] button[data-baseweb="tab"] {
             font-size: 1.15rem;
-            padding: 10px 22px;
+            padding: 12px 24px;
             height: auto;
           }
           .stTabs [data-baseweb="tab-list"] button[data-baseweb="tab"] p {
             font-size: 1.15rem;
+          }
+          /* Enlarge Material Symbols icons inside tab labels */
+          .stTabs button[data-baseweb="tab"] span[data-testid="stIconMaterial"] {
+            font-size: 1.6rem !important;
+            margin-right: 4px;
           }
           .stTabs [data-baseweb="tab-list"] button[data-baseweb="tab"][aria-selected="true"] {
             font-weight: 600;

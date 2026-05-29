@@ -26,6 +26,10 @@ Resources:
       FunctionName: newpodcaster-generator
       CodeUri: src/
       Handler: generator.handler.handler
+      LoggingConfig:
+        LogFormat: Text
+        ApplicationLogLevel: INFO
+        SystemLogLevel: INFO
       Environment:
         Variables:
           S3_BUCKET: !Ref S3BucketName
