@@ -9,8 +9,9 @@ from google.genai import types as genai_types
 
 from generator.types import Article, Turn
 
-# higher free-tier RPD than 2.5-flash; sufficient for dialog scripting
-MODEL = "gemini-2.5-flash-lite"
+# Gemini 3.1 Flash Lite — much higher free-tier RPD (~500) than 2.5-flash-lite (~20),
+# sufficient for dialog scripting across 4 topics × 5 articles/day with headroom.
+MODEL = "gemini-3.1-flash-lite"
 
 SYSTEM_PROMPT_EN = (
     "You are a script writer for a snappy news podcast.\n"
