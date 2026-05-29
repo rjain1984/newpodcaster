@@ -27,7 +27,7 @@ Resources:
       CodeUri: src/
       Handler: generator.handler.handler
       LoggingConfig:
-        LogFormat: Text
+        LogFormat: JSON
         ApplicationLogLevel: INFO
         SystemLogLevel: INFO
       Environment:
