@@ -92,6 +92,12 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
   <div class="ctrl">
     <button class="play-btn" id="play-{i}" data-idx="{i}" aria-label="Play">▶</button>
     <span class="time" id="time-{i}">--:-- / --:--</span>
+    <div class="speed-group" role="group" aria-label="Playback speed">
+      <button class="speed-btn" data-idx="{i}" data-rate="1">1×</button>
+      <button class="speed-btn" data-idx="{i}" data-rate="1.25">1.25×</button>
+      <button class="speed-btn active" data-idx="{i}" data-rate="1.5">1.5×</button>
+      <button class="speed-btn" data-idx="{i}" data-rate="2">2×</button>
+    </div>
   </div>
 </div>
 """)
@@ -157,6 +163,25 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
     font-size: 0.9rem;
     color: rgba(250,250,250,0.75);
   }}
+  .ep-card .speed-group {{
+    display: flex; gap: 4px; margin-left: auto;
+  }}
+  .ep-card .speed-btn {{
+    background: transparent;
+    color: rgba(250,250,250,0.75);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }}
+  .ep-card .speed-btn:hover {{ background: rgba(255,255,255,0.08); }}
+  .ep-card .speed-btn.active {{
+    background: rgba(255,75,75,0.18);
+    color: #FF4B4B;
+    border-color: rgba(255,75,75,0.55);
+  }}
   .ep-card.playing {{ border-color: rgba(255,75,75,0.55); }}
   .err {{ color: #ff8a8a; font-size: 0.85em; }}
 </style>
@@ -211,6 +236,20 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
       }} else {{
         playEpisode(idx);
       }}
+    }});
+
+    // Default playback rate 1.5x (~4.8 wps effective)
+    ws.on('ready', () => {{ ws.setPlaybackRate(1.5, false); }});
+
+    // Wire up the speed buttons for THIS card
+    document.querySelectorAll('.ep-card#ep-' + idx + ' .speed-btn').forEach((sb) => {{
+      sb.addEventListener('click', () => {{
+        const rate = parseFloat(sb.getAttribute('data-rate'));
+        ws.setPlaybackRate(rate, false);
+        document.querySelectorAll('.ep-card#ep-' + idx + ' .speed-btn')
+          .forEach((b) => b.classList.remove('active'));
+        sb.classList.add('active');
+      }});
     }});
 
     ws.on('ready', () => {{
