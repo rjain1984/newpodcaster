@@ -27,6 +27,12 @@ TOPIC_FEEDS: dict[str, list[str]] = {
     "india": [
         "https://feeds.bbci.co.uk/news/world/asia/india/rss.xml",
     ],
+    "hindi": [
+        # BBC's Hindi service. Articles are in Devanagari; the dialog generator
+        # turns them into natural Hinglish (Hindi + English code-mixing), not
+        # formal literary Hindi. See dialog.py SYSTEM_PROMPT_HINGLISH.
+        "https://feeds.bbci.co.uk/hindi/rss.xml",
+    ],
 }
 DEFAULT_TOPIC = "football"
 DAILY_CAP = 5

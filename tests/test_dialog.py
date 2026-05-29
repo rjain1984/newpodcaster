@@ -3,7 +3,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from generator.dialog import DialogError, generate_dialog
+from generator.dialog import (
+    SYSTEM_PROMPT_EN,
+    SYSTEM_PROMPT_HINGLISH,
+    DialogError,
+    generate_dialog,
+)
 from generator.types import Article
 
 
@@ -71,3 +76,36 @@ def test_generate_dialog_includes_article_in_prompt():
     contents = call.kwargs["contents"]
     assert "Arsenal beat Spurs in dramatic derby" in contents
     assert "Arsenal won 3-1" in contents
+
+
+def test_generate_dialog_uses_english_prompt_by_default():
+    """When no topic is given, the English system prompt is used."""
+    payload = json.dumps([{"speaker": "host_a", "text": "ok"}])
+    fake_client = MagicMock()
+    fake_client.models.generate_content.return_value = _mock_response(payload)
+    with patch("generator.dialog._client", return_value=fake_client):
+        generate_dialog(_article(), api_key="FAKE")
+    call = fake_client.models.generate_content.call_args
+    assert call.kwargs["config"].system_instruction == SYSTEM_PROMPT_EN
+
+
+def test_generate_dialog_uses_hinglish_prompt_for_hindi_topic():
+    """When topic='hindi', the Hinglish system prompt is used."""
+    payload = json.dumps([{"speaker": "host_a", "text": "ok"}])
+    fake_client = MagicMock()
+    fake_client.models.generate_content.return_value = _mock_response(payload)
+    with patch("generator.dialog._client", return_value=fake_client):
+        generate_dialog(_article(), api_key="FAKE", topic="hindi")
+    call = fake_client.models.generate_content.call_args
+    assert call.kwargs["config"].system_instruction == SYSTEM_PROMPT_HINGLISH
+
+
+def test_generate_dialog_non_hindi_topic_still_uses_english():
+    """Any topic other than 'hindi' uses the English prompt."""
+    payload = json.dumps([{"speaker": "host_a", "text": "ok"}])
+    fake_client = MagicMock()
+    fake_client.models.generate_content.return_value = _mock_response(payload)
+    with patch("generator.dialog._client", return_value=fake_client):
+        generate_dialog(_article(), api_key="FAKE", topic="f1")
+    call = fake_client.models.generate_content.call_args
+    assert call.kwargs["config"].system_instruction == SYSTEM_PROMPT_EN

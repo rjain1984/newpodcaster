@@ -38,7 +38,7 @@ def handler(event, context) -> dict:
         is_transient = False
         try:
             article = extract_article(cand["url"])
-            turns = generate_dialog(article, api_key=cfg.gemini_api_key)
+            turns = generate_dialog(article, api_key=cfg.gemini_api_key, topic=topic)
             audio = render_audio(turns, api_key=cfg.gemini_api_key)
             save_episode(article, audio, topic=topic)
             generated += 1

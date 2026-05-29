@@ -12,7 +12,7 @@ from generator.types import Article, Turn
 # higher free-tier RPD than 2.5-flash; sufficient for dialog scripting
 MODEL = "gemini-2.5-flash-lite"
 
-SYSTEM_PROMPT = (
+SYSTEM_PROMPT_EN = (
     "You are a script writer for a snappy news podcast.\n"
     "Two hosts named Alex (host_a) and Sam (host_b) chat about a single news article.\n"
     "Tone: conversational, punchy, energetic. Avoid jargon. "
@@ -32,6 +32,44 @@ SYSTEM_PROMPT = (
     "Do not include any prose outside the JSON array."
 )
 
+SYSTEM_PROMPT_HINGLISH = (
+    "Tum ek snappy news podcast ke liye script likh rahe ho.\n"
+    "Do hosts hain — Alex (host_a) aur Sam (host_b) — ek news article par baat kar rahe hain.\n"
+    "\n"
+    "**LANGUAGE — VERY IMPORTANT:**\n"
+    "Dialog NATURAL CONVERSATIONAL HINGLISH mein likho — Hindi aur English ka casual mix, "
+    "jaise urban Indians normally bolte hain. "
+    "Devanagari script for Hindi words and Latin for English.\n"
+    "AVOID karo pure literary/शुद्ध Hindi (Sanskritised, news-anchor style). "
+    "AVOID karo pure English bhi. Real, friendly Hinglish chahiye.\n"
+    "Examples of the vibe we want:\n"
+    "  'Toh यार, ये news pretty interesting hai.'\n"
+    "  'Bilkul, और जो main point है vo ये hai...'\n"
+    "  'I mean, क्या ये actually game-changer है?'\n"
+    "  'Achha तो basically...'\n"
+    "Common conversational glue: यार, भाई, अच्छा, सही है, मतलब, basically, actually, "
+    "literally, बस, तो, फिर, देखो, सुनो.\n"
+    "Proper nouns and technical terms (team names, places, brands) stay in their original form. "
+    "Numbers, scores, and English idioms used naturally are fine.\n"
+    "Tone: conversational, punchy, friendly — like two friends discussing news over chai.\n"
+    "\n"
+    "Article ki facts ke saath stick karo — kuch invent मत करो.\n"
+    "Target podcast length: 3-5 minutes audio (~600-1000 words of dialog).\n"
+    "Structure:\n"
+    "  - 1-line hook se start karo (~10 sec).\n"
+    "  - Main facts (~90 sec).\n"
+    "  - Quick context, implications, kya watch karna hai (~60-90 sec).\n"
+    "  - Ek line ka sign-off.\n"
+    "Most turns 1-3 sentences ke. No long monologues, no filler.\n"
+    "\n"
+    'Output strictly a JSON array — each item: `speaker` ("host_a" or "host_b") and `text`. '
+    "No prose outside the JSON array."
+)
+
+
+def _system_prompt_for_topic(topic: str | None) -> str:
+    return SYSTEM_PROMPT_HINGLISH if topic == "hindi" else SYSTEM_PROMPT_EN
+
 
 class DialogError(RuntimeError):
     pass
@@ -41,7 +79,7 @@ def _client(api_key: str):  # extracted for easy mocking
     return genai.Client(api_key=api_key)
 
 
-def generate_dialog(article: Article, api_key: str) -> list[Turn]:
+def generate_dialog(article: Article, api_key: str, topic: str | None = None) -> list[Turn]:
     user_prompt = (
         f"Article title: {article['title']}\n\n"
         f"Article body:\n{article['body']}"
@@ -51,7 +89,7 @@ def generate_dialog(article: Article, api_key: str) -> list[Turn]:
         model=MODEL,
         contents=user_prompt,
         config=genai_types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=_system_prompt_for_topic(topic),
             response_mime_type="application/json",
         ),
     )

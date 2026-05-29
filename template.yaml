@@ -73,6 +73,13 @@ Resources:
             Description: Daily India run
             Enabled: true
             Input: '{"topic": "india"}'
+        DailyCronHindi:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 17 * * ? *)
+            Description: Daily Hindi (Hinglish) run from BBC Hindi feed
+            Enabled: true
+            Input: '{"topic": "hindi"}'
 
 Outputs:
   FunctionName:

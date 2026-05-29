@@ -16,6 +16,7 @@ TABS = [
     ("football", ":material/sports_soccer: Football"),
     ("f1", ":material/sports_motorsports: F1"),
     ("india", ":material/temple_hindu: India"),
+    ("hindi", ":material/translate: हिंदी"),
 ]
 
 
@@ -62,6 +63,8 @@ def _infer_topic(ep: dict) -> str:
     url = ep.get("url", "")
     if "formula1" in url:
         return "f1"
+    if "/hindi/" in url or url.startswith("https://www.bbc.com/hindi"):
+        return "hindi"
     if "/asia/india/" in url or url.startswith("https://www.bbc.com/news/world/asia/india"):
         return "india"
     return "football"
