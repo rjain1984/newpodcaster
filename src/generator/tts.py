@@ -17,10 +17,15 @@ logger = logging.getLogger(__name__)
 # 429s on quota, fall through to the next. The chain mixes Flash + Pro variants
 # so the buckets are genuinely separate.
 TTS_MODELS_FALLBACK = [
-    "gemini-3.1-flash-tts",            # newest, highest free-tier quota
-    "gemini-2.5-flash-tts",            # GA 2.5 release, separate quota bucket
-    "gemini-2.5-flash-lite-tts",       # Flash Lite TTS variant, separate quota
-    "gemini-2.5-flash-preview-tts",    # original preview, last-resort fallback
+    # Live API IDs all seem to use the `-preview-tts` suffix. The non-preview
+    # versions (gemini-3.1-flash-tts, gemini-2.5-flash-tts, etc.) 404'd against
+    # the user's key on 2026-05-29 — those names appear to be AI Studio display
+    # labels, not API IDs. Each entry below is a SEPARATE quota bucket.
+    "gemini-3.1-flash-preview-tts",
+    "gemini-3.1-pro-preview-tts",
+    "gemini-3.0-flash-preview-tts",
+    "gemini-2.5-pro-preview-tts",
+    "gemini-2.5-flash-preview-tts",    # confirmed working on 2026-05-29
 ]
 # Backward-compat: first model is the primary
 MODEL = TTS_MODELS_FALLBACK[0]
