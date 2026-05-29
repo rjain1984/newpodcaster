@@ -107,13 +107,19 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
     audio_urls_js = json.dumps(audio_urls)
     cards_html = "\n".join(cards)
     return f"""
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {{ color-scheme: dark light; }}
   html, body {{
     margin: 0; padding: 0;
     background: transparent;
     color: #FAFAFA;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    /* Noto Sans Devanagari first so Hindi titles render cleanly; Latin falls
+       through to system fonts. */
+    font-family: 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont,
+                 'Segoe UI', sans-serif;
   }}
   .ep-card {{
     border: 1px solid rgba(255,255,255,0.12);
@@ -307,10 +313,19 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
 
 
 def _inject_parent_styles() -> None:
-    """Inject CSS into the Streamlit parent page to enlarge tab fonts."""
+    """Inject CSS into the Streamlit parent page to enlarge tab fonts +
+    load Noto Sans Devanagari for Hindi text rendering."""
     st.markdown(
         """
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
+          /* Ensure Devanagari renders properly across the whole app. */
+          html, body, [class*="st-"], h1, h2, h3, h4, h5, h6, p, span, div {
+            font-family: 'Noto Sans Devanagari', "Source Sans Pro",
+                         -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+          }
           .stTabs [data-baseweb="tab-list"] { gap: 8px; }
           .stTabs [data-baseweb="tab-list"] button[data-baseweb="tab"] {
             font-size: 1.15rem;
