@@ -1,17 +1,29 @@
-"""Generate a two-host dialog from an article using Gemini 2.5 Flash."""
+"""Generate a two-host dialog from an article using Gemini, with model fallback."""
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 
 from generator.types import Article, Turn
 
-# Gemini 3.1 Flash Lite — much higher free-tier RPD (~500) than 2.5-flash-lite (~20),
-# sufficient for dialog scripting across 4 topics × 5 articles/day with headroom.
-MODEL = "gemini-3.1-flash-lite"
+logger = logging.getLogger(__name__)
+
+# Try models in this order. Each Gemini model has its OWN free-tier daily quota,
+# so when one model 429s, falling through to the next gives us a fresh bucket.
+# Ordered roughly by free-tier RPD (highest first) then by recency.
+TEXT_MODELS_FALLBACK = [
+    "gemini-3.1-flash-lite",  # ~500 RPD on free tier
+    "gemini-2.5-flash",        # different model = separate quota bucket
+    "gemini-2.5-flash-lite",   # 20 RPD on free tier
+    "gemini-2.0-flash-lite",   # legacy fallback, separate quota
+]
+# Backward-compat export — first model is the primary.
+MODEL = TEXT_MODELS_FALLBACK[0]
 
 SYSTEM_PROMPT_EN = (
     "You are a script writer for a snappy news podcast.\n"
@@ -80,26 +92,61 @@ def _client(api_key: str):  # extracted for easy mocking
     return genai.Client(api_key=api_key)
 
 
+def _is_recoverable(e: genai_errors.ClientError) -> bool:
+    """Decide whether to try the next model. Recoverable: 429 (quota), 404
+    (model not available to this key), or 400 (model unrecognized)."""
+    code = getattr(e, "status_code", None) or getattr(e, "code", None)
+    return code in (400, 404, 429)
+
+
 def generate_dialog(article: Article, api_key: str, topic: str | None = None) -> list[Turn]:
     user_prompt = (
         f"Article title: {article['title']}\n\n"
         f"Article body:\n{article['body']}"
     )
     client = _client(api_key)
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=user_prompt,
-        config=genai_types.GenerateContentConfig(
-            system_instruction=_system_prompt_for_topic(topic),
-            response_mime_type="application/json",
-        ),
-    )
+    system_instruction = _system_prompt_for_topic(topic)
+
+    last_recoverable_err: genai_errors.ClientError | None = None
+    response = None
+    used_model: str | None = None
+    for model in TEXT_MODELS_FALLBACK:
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=user_prompt,
+                config=genai_types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    response_mime_type="application/json",
+                ),
+            )
+            used_model = model
+            logger.info("dialog generated via model=%s", model)
+            break
+        except genai_errors.ClientError as e:
+            if _is_recoverable(e):
+                logger.warning(
+                    "dialog model %s unavailable (status=%s); trying next",
+                    model, getattr(e, "status_code", "?"),
+                )
+                last_recoverable_err = e
+                continue
+            raise  # permanent client error — propagate
+
+    if response is None:
+        # Every model in the fallback list returned a recoverable error
+        # (typically all 429s). Re-raise the last one so the handler treats
+        # this as a transient failure and the URL is not marked seen.
+        assert last_recoverable_err is not None
+        raise last_recoverable_err
 
     raw = (response.text or "").strip()
     try:
         parsed: Any = json.loads(raw)
     except json.JSONDecodeError as e:
-        raise DialogError(f"could not parse Gemini response as JSON: {e}\nraw={raw!r}") from e
+        raise DialogError(
+            f"could not parse Gemini response as JSON (model={used_model}): {e}\nraw={raw!r}"
+        ) from e
 
     if not isinstance(parsed, list) or not parsed:
         raise DialogError(f"expected non-empty JSON array, got {type(parsed).__name__}")
