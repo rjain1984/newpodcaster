@@ -11,7 +11,8 @@ import streamlit.components.v1 as components
 from botocore.exceptions import ClientError
 
 EPISODES_KEY = "index/episodes.json"
-PRESIGNED_URL_TTL_SECONDS = 3600
+# 6h instead of 1h so an open browser tab doesn't drift into expired-URL territory.
+PRESIGNED_URL_TTL_SECONDS = 6 * 3600
 TABS = [
     ("football", ":material/sports_soccer: Football"),
     ("f1", ":material/sports_motorsports: F1"),
@@ -252,7 +253,23 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
       }});
     }});
 
+    // Show loading state until ws is ready (replaces the static --:-- / --:--)
+    timeEl.textContent = 'loading…';
+
+    // Safety net: if the audio hasn't loaded after 15s, treat as failed and
+    // expose a retry button. This catches silent decode failures + dropped requests.
+    const readyTimeout = setTimeout(() => {{
+      if (!ws._npReady) {{
+        timeEl.innerHTML = '<span class="err">audio slow / failed</span> '
+          + '<button class="speed-btn" id="retry-' + idx + '">↻ reload</button>';
+        const retryBtn = document.getElementById('retry-' + idx);
+        if (retryBtn) retryBtn.addEventListener('click', () => location.reload());
+      }}
+    }}, 15000);
+
     ws.on('ready', () => {{
+      ws._npReady = true;
+      clearTimeout(readyTimeout);
       timeEl.textContent = '0:00 / ' + fmt(ws.getDuration());
     }});
     ws.on('play',  () => {{
@@ -275,7 +292,11 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
       timeEl.textContent = fmt(t) + ' / ' + fmt(ws.getDuration());
     }});
     ws.on('error', (e) => {{
-      timeEl.innerHTML = '<span class="err">audio load failed</span>';
+      clearTimeout(readyTimeout);
+      timeEl.innerHTML = '<span class="err">audio load failed</span> '
+        + '<button class="speed-btn" id="retry-' + idx + '">↻ reload</button>';
+      const retryBtn = document.getElementById('retry-' + idx);
+      if (retryBtn) retryBtn.addEventListener('click', () => location.reload());
       console.error('wavesurfer error for', url, e);
     }});
 
