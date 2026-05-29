@@ -218,12 +218,17 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
   function playEpisode(idx) {{
     if (idx < 0 || idx >= players.length || !players[idx]) return;
     pauseAllExcept(idx);
-    players[idx].play();
+    // Trigger the play button so lazy-load + autoplay-on-ready logic runs
+    const playBtn = document.getElementById('play-' + idx);
+    if (playBtn) playBtn.click();
     const card = document.getElementById('ep-' + idx);
     if (card) card.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
   }}
 
   AUDIO_URLS.forEach((url, idx) => {{
+    // Lazy: do NOT pass `url:` so wavesurfer doesn't fetch + decode 10-18MB
+    // of audio on page load. We call ws.load(url) on first play. That keeps
+    // 4 tabs × 5 cards from hammering the browser at once.
     const ws = WaveSurfer.create({{
       container: '#wave-' + idx,
       waveColor: 'rgba(255,75,75,0.40)',
@@ -233,14 +238,23 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
       barWidth: 2,
       barGap: 1,
       barRadius: 1,
-      url: url,
     }});
     const btn = document.getElementById('play-' + idx);
     const timeEl = document.getElementById('time-' + idx);
     const card = document.getElementById('ep-' + idx);
+    let loaded = false;
 
     btn.addEventListener('click', () => {{
-      if (ws.isPlaying()) {{
+      if (!loaded) {{
+        timeEl.textContent = 'loading…';
+        ws.load(url);
+        loaded = true;
+        // Auto-play once wavesurfer signals it has enough data
+        ws.once('ready', () => {{
+          pauseAllExcept(idx);
+          ws.play();
+        }});
+      }} else if (ws.isPlaying()) {{
         ws.pause();
       }} else {{
         playEpisode(idx);
@@ -321,10 +335,13 @@ def _inject_parent_styles() -> None:
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
-          /* Ensure Devanagari renders properly across the whole app. */
-          html, body, [class*="st-"], h1, h2, h3, h4, h5, h6, p, span, div {
+          /* Devanagari font for content text only. Targeting spans/divs killed
+             Material Symbols icons (they rely on their own font-family).
+             Note: NOT using !important — Streamlit's icon spans need to keep
+             their Material Symbols font. */
+          html, body, h1, h2, h3, h4, h5, h6, p {
             font-family: 'Noto Sans Devanagari', "Source Sans Pro",
-                         -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+                         -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           }
           .stTabs [data-baseweb="tab-list"] { gap: 8px; }
           .stTabs [data-baseweb="tab-list"] button[data-baseweb="tab"] {
