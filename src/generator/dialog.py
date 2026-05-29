@@ -9,7 +9,8 @@ from google.genai import types as genai_types
 
 from generator.types import Article, Turn
 
-MODEL = "gemini-2.5-flash"
+# higher free-tier RPD than 2.5-flash; sufficient for dialog scripting
+MODEL = "gemini-2.5-flash-lite"
 
 SYSTEM_PROMPT = (
     "You are a script writer for an in-depth news podcast.\n"
