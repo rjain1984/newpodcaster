@@ -1,8 +1,15 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from google.genai import errors as genai_errors
 
-from generator.tts import HOST_A_NAME, HOST_B_NAME, TtsError, render_audio
+from generator.tts import (
+    HOST_A_NAME,
+    HOST_B_NAME,
+    TTS_MODELS_FALLBACK,
+    TtsError,
+    render_audio,
+)
 
 
 def _audio_response(audio_bytes: bytes) -> MagicMock:
@@ -76,3 +83,62 @@ def test_render_audio_formats_input_with_speaker_names():
     contents = call.kwargs["contents"]
     assert f"{HOST_A_NAME}: Hello." in contents
     assert f"{HOST_B_NAME}: Hi back." in contents
+
+
+def _quota_err(model: str) -> genai_errors.ClientError:
+    return genai_errors.ClientError(
+        429,
+        {"error": {"code": 429, "message": f"quota exceeded for {model}"}},
+        None,
+    )
+
+
+def _model_not_found_err(model: str) -> genai_errors.ClientError:
+    return genai_errors.ClientError(
+        404,
+        {"error": {"code": 404, "message": f"model {model} not found"}},
+        None,
+    )
+
+
+def test_render_audio_falls_through_to_next_model_on_quota():
+    """When the primary TTS model 429s, try the next one in TTS_MODELS_FALLBACK."""
+    turns = [{"speaker": "host_a", "text": "hi"}]
+    fake_client = MagicMock()
+    fake_client.models.generate_content.side_effect = [
+        _quota_err(TTS_MODELS_FALLBACK[0]),
+        _audio_response(b"\x00\x01" * 50),
+    ]
+    with patch("generator.tts._client", return_value=fake_client):
+        audio = render_audio(turns, api_key="FAKE")
+    assert audio[:4] == b"RIFF"
+    assert fake_client.models.generate_content.call_count == 2
+    second_call = fake_client.models.generate_content.call_args_list[1]
+    assert second_call.kwargs["model"] == TTS_MODELS_FALLBACK[1]
+
+
+def test_render_audio_falls_through_on_model_not_found():
+    """A 404 from one model (e.g. preview model unavailable to the key) skips to the next."""
+    turns = [{"speaker": "host_a", "text": "hi"}]
+    fake_client = MagicMock()
+    fake_client.models.generate_content.side_effect = [
+        _model_not_found_err(TTS_MODELS_FALLBACK[0]),
+        _audio_response(b"\x00\x01" * 50),
+    ]
+    with patch("generator.tts._client", return_value=fake_client):
+        audio = render_audio(turns, api_key="FAKE")
+    assert audio[:4] == b"RIFF"
+
+
+def test_render_audio_reraises_when_all_models_exhausted():
+    """If every TTS model 429s, propagate the last error so the handler
+    treats it as transient and the URL isn't marked seen."""
+    turns = [{"speaker": "host_a", "text": "hi"}]
+    fake_client = MagicMock()
+    fake_client.models.generate_content.side_effect = [
+        _quota_err(m) for m in TTS_MODELS_FALLBACK
+    ]
+    with patch("generator.tts._client", return_value=fake_client):
+        with pytest.raises(genai_errors.ClientError):
+            render_audio(turns, api_key="FAKE")
+    assert fake_client.models.generate_content.call_count == len(TTS_MODELS_FALLBACK)
