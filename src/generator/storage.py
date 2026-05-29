@@ -47,7 +47,7 @@ def _put_json(key: str, value) -> None:
     )
 
 
-def save_episode(article: Article, audio: bytes) -> Episode:
+def save_episode(article: Article, audio: bytes, topic: str | None = None) -> Episode:
     episode_id = str(uuid.uuid4())
     audio_key = f"{AUDIO_PREFIX}{episode_id}.wav"
     _s3().put_object(
@@ -64,6 +64,7 @@ def save_episode(article: Article, audio: bytes) -> Episode:
         "created_at": datetime.now(UTC).isoformat(),
         "audio_key": audio_key,
         "image_url": article.get("image_url"),
+        "topic": topic,
     }
     existing = _get_json(EPISODES_KEY, default=[])
     existing.insert(0, episode)  # newest first

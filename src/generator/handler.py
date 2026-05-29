@@ -24,9 +24,10 @@ INTER_ARTICLE_SLEEP_SECONDS = 21
 
 def handler(event, context) -> dict:
     cfg = load_config()
+    topic = (event or {}).get("topic", "football")
     seen = load_seen_urls()
-    candidates = discover(now=datetime.now(UTC), seen_urls=seen)
-    logger.info("discovered %d candidates", len(candidates))
+    candidates = discover(now=datetime.now(UTC), seen_urls=seen, topic=topic)
+    logger.info("topic=%s discovered=%d candidates", topic, len(candidates))
 
     generated = 0
     errors = 0
@@ -39,7 +40,7 @@ def handler(event, context) -> dict:
             article = extract_article(cand["url"])
             turns = generate_dialog(article, api_key=cfg.gemini_api_key)
             audio = render_audio(turns, api_key=cfg.gemini_api_key)
-            save_episode(article, audio)
+            save_episode(article, audio, topic=topic)
             generated += 1
             logger.info("generated episode for %s", cand["url"])
         except (genai_errors.ClientError, genai_errors.ServerError) as e:

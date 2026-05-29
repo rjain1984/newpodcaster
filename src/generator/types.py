@@ -34,3 +34,4 @@ class Episode(TypedDict):
     created_at: str      # ISO 8601 UTC
     audio_key: str       # S3 key for the audio file
     image_url: NotRequired[str | None]  # carried through from Article
+    topic: NotRequired[str]  # "football" | "f1" | "india"

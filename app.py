@@ -1,4 +1,4 @@
-"""Streamlit viewer for newpodcaster. Reads episodes from S3, plays them with a waveform."""
+"""Streamlit viewer for newpodcaster. Three topic tabs + auto-play queue."""
 from __future__ import annotations
 
 import html
@@ -12,6 +12,11 @@ from botocore.exceptions import ClientError
 
 EPISODES_KEY = "index/episodes.json"
 PRESIGNED_URL_TTL_SECONDS = 3600
+TABS = [
+    ("football", "⚽ Football"),
+    ("f1", "🏎️ F1"),
+    ("india", "🇮🇳 India"),
+]
 
 
 @st.cache_resource
@@ -47,81 +52,173 @@ def _presigned_url(audio_key: str) -> str:
 
 
 def _human_date(iso: str) -> str:
-    """Format ISO 8601 UTC timestamp as a short readable date with explicit UTC label."""
     dt = datetime.fromisoformat(iso)
     return dt.strftime("%b %d, %Y at %I:%M %p UTC")
 
 
-def _player_html(ep_id: str, audio_url: str) -> str:
-    """Render a wavesurfer.js waveform player for one episode."""
-    safe = ep_id.replace("-", "")
-    audio_url_js = json.dumps(audio_url)
+def _infer_topic(ep: dict) -> str:
+    """Get the episode's explicit topic, or infer from URL for backward compat."""
+    if ep.get("topic"):
+        return ep["topic"]
+    url = ep.get("url", "")
+    if "formula1" in url:
+        return "f1"
+    if "/asia/india/" in url or url.startswith("https://www.bbc.com/news/world/asia/india"):
+        return "india"
+    return "football"
+
+
+def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
+    """Render all episodes for one tab as a single HTML block with coordinated
+    wavesurfer.js players that auto-advance to the next episode when one finishes."""
+    cards = []
+    for i, ep in enumerate(episodes):
+        title = html.escape(ep["title"])
+        article_url = html.escape(ep["url"])
+        date_str = html.escape(_human_date(ep["created_at"]))
+        image_url = ep.get("image_url")
+        thumb = ""
+        if image_url:
+            thumb = (
+                f'<a href="{article_url}" target="_blank" rel="noopener">'
+                f'<img class="thumb" src="{html.escape(image_url)}" '
+                f'alt="article thumbnail"/></a>'
+            )
+        cards.append(f"""
+<div class="ep-card" id="ep-{i}">
+  {thumb}
+  <h3>{title}</h3>
+  <p class="meta">{date_str}</p>
+  <div class="wave" id="wave-{i}"></div>
+  <div class="ctrl">
+    <button class="play-btn" id="play-{i}" data-idx="{i}" aria-label="Play">▶</button>
+    <span class="time" id="time-{i}">--:-- / --:--</span>
+  </div>
+</div>
+""")
+    audio_urls_js = json.dumps(audio_urls)
+    cards_html = "\n".join(cards)
     return f"""
 <style>
-  body {{ margin: 0; background: transparent; color: inherit; }}
-  .player-{safe} {{
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 8px;
-    padding: 12px 14px;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  body {{ margin: 0; background: transparent; color: inherit;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }}
+  .ep-card {{
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 18px;
+    background: rgba(255,255,255,0.02);
   }}
-  .wave-{safe} {{ width: 100%; margin-bottom: 10px; }}
-  .ctrl-{safe} {{ display: flex; align-items: center; gap: 12px; }}
-  .play-{safe} {{
+  .ep-card .thumb {{
+    width: 100%;
+    max-height: 240px;
+    object-fit: cover;
+    border-radius: 6px;
+    display: block;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }}
+  .ep-card .thumb:hover {{ transform: scale(1.01); }}
+  .ep-card h3 {{ margin: 12px 0 4px; font-size: 1.05em; font-weight: 600; }}
+  .ep-card .meta {{ margin: 0 0 10px; font-size: 0.85em; opacity: 0.65; }}
+  .ep-card .wave {{ width: 100%; margin: 8px 0; min-height: 64px; }}
+  .ep-card .ctrl {{ display: flex; align-items: center; gap: 12px; }}
+  .ep-card .play-btn {{
     background: #FF4B4B;
     color: white;
     border: none;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    font-size: 16px;
+    width: 42px;
+    height: 42px;
+    font-size: 17px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
   }}
-  .play-{safe}:hover {{ background: #e63f3f; }}
-  .time-{safe} {{ font-family: monospace; font-size: 0.9em; opacity: 0.75; }}
+  .ep-card .play-btn:hover {{ background: #e63f3f; }}
+  .ep-card .time {{ font-family: monospace; font-size: 0.85em; opacity: 0.7; }}
+  .ep-card.playing {{ border-color: rgba(255,75,75,0.5); }}
 </style>
-<div class="player-{safe}">
-  <div class="wave-{safe}" id="wave-{safe}"></div>
-  <div class="ctrl-{safe}">
-    <button class="play-{safe}" id="play-{safe}" aria-label="Play">▶</button>
-    <span class="time-{safe}" id="time-{safe}">--:-- / --:--</span>
-  </div>
+<div class="tab-content">
+  {cards_html}
 </div>
 <script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@7.8.6/dist/wavesurfer.min.js"></script>
 <script>
 (function() {{
+  var AUDIO_URLS = {audio_urls_js};
+  var players = [];
+
   function fmt(s) {{
     s = Math.floor(s || 0);
     var m = Math.floor(s / 60);
     var sec = s % 60;
     return m + ':' + (sec < 10 ? '0' : '') + sec;
   }}
-  var ws = WaveSurfer.create({{
-    container: '#wave-{safe}',
-    waveColor: 'rgba(255, 75, 75, 0.35)',
-    progressColor: '#FF4B4B',
-    cursorColor: '#FF4B4B',
-    height: 64,
-    barWidth: 2,
-    barGap: 1,
-    barRadius: 1,
-    url: {audio_url_js},
-  }});
-  var btn = document.getElementById('play-{safe}');
-  var timeEl = document.getElementById('time-{safe}');
-  btn.addEventListener('click', function() {{ ws.playPause(); }});
-  ws.on('ready', function() {{
-    timeEl.textContent = '0:00 / ' + fmt(ws.getDuration());
-  }});
-  ws.on('play',  function() {{ btn.textContent = '⏸'; }});
-  ws.on('pause', function() {{ btn.textContent = '▶'; }});
-  ws.on('finish', function() {{ btn.textContent = '▶'; ws.setTime(0); }});
-  ws.on('timeupdate', function(t) {{
-    timeEl.textContent = fmt(t) + ' / ' + fmt(ws.getDuration());
+
+  function pauseAllExcept(idx) {{
+    players.forEach(function(p, i) {{ if (i !== idx && p) p.pause(); }});
+  }}
+
+  function playEpisode(idx) {{
+    if (idx < 0 || idx >= players.length || !players[idx]) return;
+    pauseAllExcept(idx);
+    players[idx].play();
+    // Scroll the playing card into view inside the iframe
+    var card = document.getElementById('ep-' + idx);
+    if (card) card.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+  }}
+
+  AUDIO_URLS.forEach(function(url, idx) {{
+    var ws = WaveSurfer.create({{
+      container: '#wave-' + idx,
+      waveColor: 'rgba(255,75,75,0.35)',
+      progressColor: '#FF4B4B',
+      cursorColor: '#FF4B4B',
+      height: 64,
+      barWidth: 2,
+      barGap: 1,
+      barRadius: 1,
+      url: url,
+    }});
+    var btn = document.getElementById('play-' + idx);
+    var timeEl = document.getElementById('time-' + idx);
+    var card = document.getElementById('ep-' + idx);
+
+    btn.addEventListener('click', function() {{
+      if (ws.isPlaying()) {{
+        ws.pause();
+      }} else {{
+        playEpisode(idx);
+      }}
+    }});
+
+    ws.on('ready', function() {{
+      timeEl.textContent = '0:00 / ' + fmt(ws.getDuration());
+    }});
+    ws.on('play',  function() {{
+      btn.textContent = '⏸';
+      card.classList.add('playing');
+    }});
+    ws.on('pause', function() {{
+      btn.textContent = '▶';
+      card.classList.remove('playing');
+    }});
+    ws.on('finish', function() {{
+      btn.textContent = '▶';
+      ws.setTime(0);
+      card.classList.remove('playing');
+      // Auto-play the next episode after a short gap
+      if (idx + 1 < players.length) {{
+        setTimeout(function() {{ playEpisode(idx + 1); }}, 600);
+      }}
+    }});
+    ws.on('timeupdate', function(t) {{
+      timeEl.textContent = fmt(t) + ' / ' + fmt(ws.getDuration());
+    }});
+
+    players.push(ws);
   }});
 }})();
 </script>
@@ -137,24 +234,31 @@ def main():
         st.info("No episodes yet. Check back after 09:00 PT.")
         return
 
-    st.caption(f"{len(episodes)} episodes — newest first")
+    # Group episodes by topic
+    grouped: dict[str, list[dict]] = {key: [] for key, _ in TABS}
     for ep in episodes:
-        with st.container(border=True):
-            image_url = ep.get("image_url")
-            if image_url:
-                # Clickable thumbnail that opens the original article in a new tab.
-                st.markdown(
-                    f'<a href="{html.escape(ep["url"])}" target="_blank" rel="noopener">'
-                    f'<img src="{html.escape(image_url)}" '
-                    f'style="width:100%;max-height:300px;object-fit:cover;'
-                    f'border-radius:6px;display:block;cursor:pointer;" /></a>',
-                    unsafe_allow_html=True,
-                )
-            st.subheader(ep["title"])
-            st.caption(_human_date(ep["created_at"]))
+        topic = _infer_topic(ep)
+        if topic in grouped:
+            grouped[topic].append(ep)
+
+    tabs = st.tabs([label for _, label in TABS])
+    for (topic_key, _label), tab in zip(TABS, tabs, strict=True):
+        with tab:
+            tab_episodes = grouped[topic_key]
+            if not tab_episodes:
+                st.info(f"No {topic_key} episodes yet.")
+                continue
+            st.caption(
+                f"{len(tab_episodes)} episode{'s' if len(tab_episodes) != 1 else ''} "
+                f"— newest first · auto-plays next on finish"
+            )
+            audio_urls = [_presigned_url(ep["audio_key"]) for ep in tab_episodes]
+            # Each card is ~460px tall; allow extra padding so nothing clips.
+            iframe_height = max(700, 480 * len(tab_episodes) + 40)
             components.html(
-                _player_html(ep["id"], _presigned_url(ep["audio_key"])),
-                height=160,
+                _tab_html(tab_episodes, audio_urls),
+                height=iframe_height,
+                scrolling=True,
             )
 
 

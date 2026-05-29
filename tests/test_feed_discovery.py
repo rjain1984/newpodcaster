@@ -6,7 +6,7 @@ import pytest
 
 from generator.feed_discovery import (
     DAILY_CAP,
-    WIDE_TO_NARROW_THRESHOLD,
+    TOPIC_FEEDS,
     discover,
 )
 
@@ -39,14 +39,14 @@ def now():
 
 def test_discover_returns_candidates_inside_window(now):
     """Articles inside the 3-day window are kept; older ones are dropped."""
-    wide_entries = [
+    entries = [
         _entry("https://w/1", "Inside", "Wed, 27 May 2026 12:00:00 GMT"),
         _entry("https://w/2", "Inside-2", "Tue, 26 May 2026 12:00:00 GMT"),
         _entry("https://w/3", "Too old", "Sun, 24 May 2026 12:00:00 GMT"),
     ]
     with patch("generator.feed_discovery.feedparser.parse") as fp:
-        fp.return_value = _fake_feedparser_parse(wide_entries)
-        result = discover(now=now, seen_urls=set())
+        fp.return_value = _fake_feedparser_parse(entries)
+        result = discover(now=now, seen_urls=set(), topic="football")
     urls = [c["url"] for c in result]
     assert "https://w/1" in urls
     assert "https://w/2" in urls
@@ -54,13 +54,13 @@ def test_discover_returns_candidates_inside_window(now):
 
 
 def test_discover_dedups_against_seen(now):
-    wide_entries = [
+    entries = [
         _entry("https://w/1", "A", "Wed, 27 May 2026 12:00:00 GMT"),
         _entry("https://w/2", "B", "Wed, 27 May 2026 12:00:00 GMT"),
     ]
     with patch("generator.feed_discovery.feedparser.parse") as fp:
-        fp.return_value = _fake_feedparser_parse(wide_entries)
-        result = discover(now=now, seen_urls={"https://w/1"})
+        fp.return_value = _fake_feedparser_parse(entries)
+        result = discover(now=now, seen_urls={"https://w/1"}, topic="football")
     assert [c["url"] for c in result] == ["https://w/2"]
 
 
@@ -71,29 +71,30 @@ def test_discover_caps_to_daily_limit(now):
     ]
     with patch("generator.feed_discovery.feedparser.parse") as fp:
         fp.return_value = _fake_feedparser_parse(entries)
-        result = discover(now=now, seen_urls=set())
+        result = discover(now=now, seen_urls=set(), topic="football")
     assert len(result) == DAILY_CAP
 
 
-def test_discover_swaps_to_narrow_when_over_threshold(now):
-    """If wide-net yields >10 candidates, swap to narrow feeds."""
-    wide_entries = [
-        _entry(f"https://wide/{i}", f"WT{i}", "Wed, 27 May 2026 12:00:00 GMT")
-        for i in range(WIDE_TO_NARROW_THRESHOLD + 5)
-    ]
-    narrow_entries = [
-        _entry("https://narrow/arsenal", "Arsenal news", "Wed, 27 May 2026 12:00:00 GMT"),
-    ]
+def test_discover_uses_only_feeds_for_requested_topic(now):
+    """An f1-topic request must only hit f1 feeds; a football request only football feeds."""
+    f1_entry = [_entry("https://f1/x", "F1 news", "Wed, 27 May 2026 12:00:00 GMT")]
+    football_entry = [_entry("https://fb/x", "FB news", "Wed, 27 May 2026 12:00:00 GMT")]
+    india_entry = [_entry("https://in/x", "IN news", "Wed, 27 May 2026 12:00:00 GMT")]
 
     def fake_parse(url):
-        # Match all WIDE_FEEDS slugs; everything else (NARROW_FEEDS) gets narrow_entries
-        if any(s in url for s in ("european", "champions-league", "formula1", "/india/")):
-            return _fake_feedparser_parse(wide_entries)
-        return _fake_feedparser_parse(narrow_entries)
+        if "formula1" in url:
+            return _fake_feedparser_parse(f1_entry)
+        if "/india/" in url:
+            return _fake_feedparser_parse(india_entry)
+        return _fake_feedparser_parse(football_entry)
 
-    with patch("generator.feed_discovery.feedparser.parse", side_effect=fake_parse):
-        result = discover(now=now, seen_urls=set())
-    assert all(c["url"].startswith("https://narrow") for c in result)
+    with patch("generator.feed_discovery.feedparser.parse", side_effect=fake_parse) as fp:
+        result = discover(now=now, seen_urls=set(), topic="f1")
+        assert [c["url"] for c in result] == ["https://f1/x"]
+        # Only F1 feed should have been queried
+        called_urls = [call.args[0] for call in fp.call_args_list]
+        assert all("formula1" in u for u in called_urls)
+        assert len(called_urls) == len(TOPIC_FEEDS["f1"])
 
 
 def test_discover_handles_feed_error(now):
@@ -109,5 +110,16 @@ def test_discover_handles_feed_error(now):
         return _fake_feedparser_parse(good)
 
     with patch("generator.feed_discovery.feedparser.parse", side_effect=fake_parse):
-        result = discover(now=now, seen_urls=set())
+        result = discover(now=now, seen_urls=set(), topic="football")
+    # Football has 4 feeds: first fails, remaining 3 succeed
     assert [c["url"] for c in result] == ["https://w/ok"]
+
+
+def test_discover_unknown_topic_falls_back_to_default(now):
+    """If an unknown topic is passed, fall back to the default topic instead of crashing."""
+    entries = [_entry("https://w/x", "fallback", "Wed, 27 May 2026 12:00:00 GMT")]
+    with patch("generator.feed_discovery.feedparser.parse") as fp:
+        fp.return_value = _fake_feedparser_parse(entries)
+        result = discover(now=now, seen_urls=set(), topic="completely-made-up-topic")
+    # Should still return candidates from the fallback (football) feeds
+    assert len(result) > 0

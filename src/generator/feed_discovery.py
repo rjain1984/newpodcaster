@@ -1,4 +1,4 @@
-"""Discover candidate articles from BBC Sport football RSS feeds."""
+"""Discover candidate articles from BBC RSS feeds, grouped by topic."""
 from __future__ import annotations
 
 import logging
@@ -11,31 +11,39 @@ from generator.types import Candidate
 
 logger = logging.getLogger(__name__)
 
-WIDE_FEEDS = [
-    "https://feeds.bbci.co.uk/sport/football/european/rss.xml",
-    "https://feeds.bbci.co.uk/sport/football/champions-league/rss.xml",
-    "https://feeds.bbci.co.uk/sport/formula1/rss.xml",
-    "https://feeds.bbci.co.uk/news/world/asia/india/rss.xml",
-]
-NARROW_FEEDS = [
-    "https://feeds.bbci.co.uk/sport/football/premier-league/rss.xml",
-    "https://feeds.bbci.co.uk/sport/football/teams/arsenal/rss.xml",
-]
-WIDE_TO_NARROW_THRESHOLD = 10
+# Topic groups. Lambda runs one topic per invocation; the viewer shows one tab
+# per topic. Add more topics by appending to this dict and to the viewer's tab
+# list.
+TOPIC_FEEDS: dict[str, list[str]] = {
+    "football": [
+        "https://feeds.bbci.co.uk/sport/football/european/rss.xml",
+        "https://feeds.bbci.co.uk/sport/football/champions-league/rss.xml",
+        "https://feeds.bbci.co.uk/sport/football/premier-league/rss.xml",
+        "https://feeds.bbci.co.uk/sport/football/teams/arsenal/rss.xml",
+    ],
+    "f1": [
+        "https://feeds.bbci.co.uk/sport/formula1/rss.xml",
+    ],
+    "india": [
+        "https://feeds.bbci.co.uk/news/world/asia/india/rss.xml",
+    ],
+}
+DEFAULT_TOPIC = "football"
 DAILY_CAP = 5
 ROLLING_WINDOW_DAYS = 3
 
 
-def discover(now: datetime, seen_urls: set[str]) -> list[Candidate]:
-    """Pull wide feeds; if too many, swap to narrow feeds; cap to DAILY_CAP."""
-    candidates = _fetch_and_filter(WIDE_FEEDS, now, seen_urls)
-    if len(candidates) > WIDE_TO_NARROW_THRESHOLD:
-        logger.info(
-            "Wide net returned %d > %d; switching to narrow feeds",
-            len(candidates),
-            WIDE_TO_NARROW_THRESHOLD,
-        )
-        candidates = _fetch_and_filter(NARROW_FEEDS, now, seen_urls)
+def discover(
+    now: datetime,
+    seen_urls: set[str],
+    topic: str = DEFAULT_TOPIC,
+) -> list[Candidate]:
+    """Pull RSS feeds for a single topic; cap to DAILY_CAP newest items."""
+    feeds = TOPIC_FEEDS.get(topic)
+    if not feeds:
+        logger.warning("Unknown topic %r; falling back to %s", topic, DEFAULT_TOPIC)
+        feeds = TOPIC_FEEDS[DEFAULT_TOPIC]
+    candidates = _fetch_and_filter(feeds, now, seen_urls)
     candidates.sort(key=lambda c: c["pub_date"], reverse=True)
     return candidates[:DAILY_CAP]
 

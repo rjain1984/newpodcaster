@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: newpodcaster — daily BBC football podcast generator
+Description: newpodcaster — daily BBC podcast generator (football + f1 + india)
 
 Parameters:
   S3BucketName:
@@ -45,13 +45,30 @@ Resources:
               Action: secretsmanager:GetSecretValue
               Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GeminiSecretName}*
       Events:
-        DailyCron:
+        # Three daily invocations, one per topic. Spaced ~20 minutes apart so
+        # they don't run concurrently and stomp on episodes.json (single writer).
+        # Times below are UTC; 16:00 UTC = 09:00 PDT (or 08:00 PST in winter).
+        DailyCronFootball:
           Type: Schedule
           Properties:
-            # 16:00 UTC = 09:00 PDT (May–Nov) / 08:00 PST (Nov–Mar). Acceptable drift for a personal tool.
             Schedule: cron(0 16 * * ? *)
-            Description: Daily newpodcaster generator run
+            Description: Daily football run
             Enabled: true
+            Input: '{"topic": "football"}'
+        DailyCronF1:
+          Type: Schedule
+          Properties:
+            Schedule: cron(20 16 * * ? *)
+            Description: Daily F1 run
+            Enabled: true
+            Input: '{"topic": "f1"}'
+        DailyCronIndia:
+          Type: Schedule
+          Properties:
+            Schedule: cron(40 16 * * ? *)
+            Description: Daily India run
+            Enabled: true
+            Input: '{"topic": "india"}'
 
 Outputs:
   FunctionName:
