@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import UTC, datetime
 
 from generator.config import load_config
@@ -14,6 +15,10 @@ from generator.tts import render_audio
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Gemini free tier caps gemini-2.5-flash-tts at 3 requests/minute. Sleep
+# between articles so 5 articles span >60s and stay inside the limit.
+INTER_ARTICLE_SLEEP_SECONDS = 21
+
 
 def handler(event, context) -> dict:
     cfg = load_config()
@@ -23,7 +28,9 @@ def handler(event, context) -> dict:
 
     generated = 0
     errors = 0
-    for cand in candidates:
+    for i, cand in enumerate(candidates):
+        if i > 0:
+            time.sleep(INTER_ARTICLE_SLEEP_SECONDS)
         try:
             article = extract_article(cand["url"])
             turns = generate_dialog(article, api_key=cfg.gemini_api_key)

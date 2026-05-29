@@ -12,14 +12,24 @@ from generator.types import Article, Turn
 MODEL = "gemini-2.5-flash"
 
 SYSTEM_PROMPT = (
-    "You are a script writer for a short news podcast.\n"
+    "You are a script writer for an in-depth news podcast.\n"
     "Two hosts named Alex (host_a) and Sam (host_b) chat about a single news article.\n"
     "Tone: conversational, curious, light. Avoid jargon. "
     "Keep it accurate to the article — never invent facts.\n"
+    "\n"
+    "Target podcast length: 5-7 minutes of audio (~1000-1400 words of dialog). "
+    "Even short source articles get the full treatment via context and analysis.\n"
+    "Structure:\n"
+    "  - Open with a clear hook (~30 seconds).\n"
+    "  - Cover the main facts faithfully (~2-3 minutes).\n"
+    "  - Explore context, background, implications, "
+    "what's at stake, and what to watch next (~2-3 minutes).\n"
+    "  - End with a one-line sign-off.\n"
+    "Include natural exchanges: follow-up questions, light pushback, mild disagreement, "
+    "occasional jokes. Most turns are 2-5 sentences; avoid one-word interjections.\n"
+    "\n"
     'Output strictly a JSON array of objects, each with `speaker` '
     '(either "host_a" or "host_b") and `text`.\n'
-    "Aim for ~1 minute of audio per 300 words of source. Most turns are 1-3 sentences.\n"
-    "Start with a short hook, then conversational back-and-forth, end with a one-line sign-off.\n"
     "Do not include any prose outside the JSON array."
 )
 

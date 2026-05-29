@@ -17,6 +17,7 @@ def _article(url: str) -> Article:
     return {"url": url, "title": "T", "body": "b" * 300, "source": "bbc.com"}
 
 
+@patch("generator.handler.time.sleep")
 @patch("generator.handler.load_config")
 @patch("generator.handler.discover")
 @patch("generator.handler.extract_article")
@@ -34,6 +35,7 @@ def test_handler_happy_path(
     mock_extract,
     mock_discover,
     mock_load_config,
+    mock_sleep,
 ):
     mock_load_config.return_value = MagicMock(gemini_api_key="K")
     mock_load_seen.return_value = set()
@@ -50,8 +52,11 @@ def test_handler_happy_path(
     assert mock_save.call_count == 2
     # mark_seen called once per article (success or failure)
     assert mock_mark_seen.call_count == 2
+    # sleep called once (between articles 1 and 2)
+    assert mock_sleep.call_count == 1
 
 
+@patch("generator.handler.time.sleep")
 @patch("generator.handler.load_config")
 @patch("generator.handler.discover")
 @patch("generator.handler.extract_article")
@@ -69,6 +74,7 @@ def test_handler_isolates_per_article_failure(
     mock_extract,
     mock_discover,
     mock_load_config,
+    mock_sleep,
 ):
     mock_load_config.return_value = MagicMock(gemini_api_key="K")
     mock_load_seen.return_value = set()
