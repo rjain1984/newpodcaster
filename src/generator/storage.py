@@ -63,6 +63,7 @@ def save_episode(article: Article, audio: bytes) -> Episode:
         "source": article["source"],
         "created_at": datetime.now(UTC).isoformat(),
         "audio_key": audio_key,
+        "image_url": article.get("image_url"),
     }
     existing = _get_json(EPISODES_KEY, default=[])
     existing.insert(0, episode)  # newest first

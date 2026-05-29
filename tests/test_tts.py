@@ -18,16 +18,25 @@ def _audio_response(audio_bytes: bytes) -> MagicMock:
     return fake_response
 
 
-def test_render_audio_returns_bytes():
+def test_render_audio_returns_wav_wrapped_bytes():
+    """render_audio wraps the raw PCM from Gemini in a WAV container so browser
+    audio players can determine duration."""
     turns = [
         {"speaker": "host_a", "text": "Welcome."},
         {"speaker": "host_b", "text": "Glad to be here."},
     ]
     fake_client = MagicMock()
-    fake_client.models.generate_content.return_value = _audio_response(b"WAV-BYTES")
+    fake_pcm = b"\x00\x01" * 100  # 100 16-bit samples
+    fake_client.models.generate_content.return_value = _audio_response(fake_pcm)
     with patch("generator.tts._client", return_value=fake_client):
         audio = render_audio(turns, api_key="FAKE")
-    assert audio == b"WAV-BYTES"
+    # WAV header: 'RIFF....WAVE'
+    assert audio[:4] == b"RIFF"
+    assert audio[8:12] == b"WAVE"
+    # Wrapped output is larger than the raw PCM (header overhead)
+    assert len(audio) > len(fake_pcm)
+    # PCM data is preserved inside the container (find it after the header)
+    assert fake_pcm in audio
 
 
 def test_render_audio_passes_speaker_config():

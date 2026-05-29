@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 WIDE_FEEDS = [
     "https://feeds.bbci.co.uk/sport/football/european/rss.xml",
     "https://feeds.bbci.co.uk/sport/football/champions-league/rss.xml",
+    "https://feeds.bbci.co.uk/sport/formula1/rss.xml",
+    "https://feeds.bbci.co.uk/news/world/asia/india/rss.xml",
 ]
 NARROW_FEEDS = [
     "https://feeds.bbci.co.uk/sport/football/premier-league/rss.xml",

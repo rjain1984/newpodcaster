@@ -1,5 +1,5 @@
 """Shared data types used across the generator pipeline."""
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 
 class Candidate(TypedDict):
@@ -16,6 +16,7 @@ class Article(TypedDict):
     title: str
     body: str            # plain text, paragraphs separated by \n\n
     source: str          # e.g. "bbc.com"
+    image_url: NotRequired[str | None]  # primary image URL from article metadata, if any
 
 
 class Turn(TypedDict):
@@ -32,3 +33,4 @@ class Episode(TypedDict):
     source: str
     created_at: str      # ISO 8601 UTC
     audio_key: str       # S3 key for the audio file
+    image_url: NotRequired[str | None]  # carried through from Article

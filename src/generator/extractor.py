@@ -31,10 +31,11 @@ def extract_article(url: str) -> Article:
 
     metadata = trafilatura.extract_metadata(html)
     title = (metadata.title if metadata and metadata.title else "Untitled").strip()
+    image_url = metadata.image if metadata and metadata.image else None
     host = urlparse(url).hostname or ""
     source = host.removeprefix("www.")
 
-    return Article(url=url, title=title, body=body, source=source)
+    return Article(url=url, title=title, body=body, source=source, image_url=image_url)
 
 
 def _fetch_html(url: str) -> str:

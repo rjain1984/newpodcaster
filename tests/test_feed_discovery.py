@@ -86,7 +86,8 @@ def test_discover_swaps_to_narrow_when_over_threshold(now):
     ]
 
     def fake_parse(url):
-        if "european" in url or "champions-league" in url:
+        # Match all WIDE_FEEDS slugs; everything else (NARROW_FEEDS) gets narrow_entries
+        if any(s in url for s in ("european", "champions-league", "formula1", "/india/")):
             return _fake_feedparser_parse(wide_entries)
         return _fake_feedparser_parse(narrow_entries)
 
