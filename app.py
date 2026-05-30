@@ -72,8 +72,13 @@ def _infer_topic(ep: dict) -> str:
 
 
 def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
-    """Render all episodes for one tab as a single HTML block with coordinated
-    wavesurfer.js players that auto-advance to the next episode when one finishes."""
+    """Render all episodes for one tab as a single HTML block using native
+    HTML5 <audio> elements. No wavesurfer.js. The browser handles streaming,
+    decoding, scrubbing — much more reliable than embedding a JS audio library
+    inside an iframe under Streamlit Cloud's resource ceiling.
+
+    What we keep: clickable thumbnails, custom speed buttons (1x/1.25x/1.5x),
+    auto-play-next on episode end, pause-others-when-one-plays."""
     cards = []
     for i, ep in enumerate(episodes):
         title = html.escape(ep["title"])
@@ -87,24 +92,22 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
                 f'<img class="thumb" src="{html.escape(image_url)}" '
                 f'alt="article thumbnail"/></a>'
             )
+        # preload="none" keeps idle cards lightweight; native audio fetches
+        # on first interaction.
         cards.append(f"""
 <div class="ep-card" id="ep-{i}">
   {thumb}
   <h3>{title}</h3>
   <p class="meta">{date_str}</p>
-  <div class="wave" id="wave-{i}"></div>
-  <div class="ctrl">
-    <button class="play-btn" id="play-{i}" data-idx="{i}" aria-label="Play">▶</button>
-    <span class="time" id="time-{i}">--:-- / --:--</span>
-    <div class="speed-group" role="group" aria-label="Playback speed">
-      <button class="speed-btn active" data-idx="{i}" data-rate="1">1×</button>
-      <button class="speed-btn" data-idx="{i}" data-rate="1.25">1.25×</button>
-      <button class="speed-btn" data-idx="{i}" data-rate="1.5">1.5×</button>
-    </div>
+  <audio class="audio" id="audio-{i}" preload="none" controls
+         src="{html.escape(audio_urls[i])}"></audio>
+  <div class="speed-group" role="group" aria-label="Playback speed">
+    <button class="speed-btn active" data-idx="{i}" data-rate="1">1×</button>
+    <button class="speed-btn" data-idx="{i}" data-rate="1.25">1.25×</button>
+    <button class="speed-btn" data-idx="{i}" data-rate="1.5">1.5×</button>
   </div>
 </div>
 """)
-    audio_urls_js = json.dumps(audio_urls)
     cards_html = "\n".join(cards)
     return f"""
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -116,8 +119,6 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
     margin: 0; padding: 0;
     background: transparent;
     color: #FAFAFA;
-    /* Noto Sans Devanagari first so Hindi titles render cleanly; Latin falls
-       through to system fonts. */
     font-family: 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont,
                  'Segoe UI', sans-serif;
   }}
@@ -146,42 +147,27 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
     line-height: 1.35;
   }}
   .ep-card .meta {{
-    margin: 0 0 12px;
+    margin: 0 0 10px;
     font-size: 0.85rem;
     color: rgba(250,250,250,0.65);
   }}
-  .ep-card .wave {{
+  .ep-card .audio {{
     width: 100%;
-    margin: 10px 0;
-    min-height: 64px;
-  }}
-  .ep-card .ctrl {{
-    display: flex; align-items: center; gap: 14px;
-  }}
-  .ep-card .play-btn {{
-    background: #FF4B4B; color: white;
-    border: none; border-radius: 50%;
-    width: 44px; height: 44px;
-    font-size: 18px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }}
-  .ep-card .play-btn:hover {{ background: #e63f3f; }}
-  .ep-card .time {{
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.9rem;
-    color: rgba(250,250,250,0.75);
+    margin: 8px 0;
+    height: 36px;
+    /* Subtle dark-theme adjustment for native player chrome */
+    filter: invert(0.85) hue-rotate(180deg) brightness(0.9);
   }}
   .ep-card .speed-group {{
-    display: flex; gap: 4px; margin-left: auto;
+    display: flex; gap: 4px; margin-top: 6px;
   }}
   .ep-card .speed-btn {{
     background: transparent;
     color: rgba(250,250,250,0.75);
     border: 1px solid rgba(255,255,255,0.18);
     border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 0.75rem;
+    padding: 4px 10px;
+    font-size: 0.78rem;
     cursor: pointer;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }}
@@ -192,136 +178,50 @@ def _tab_html(episodes: list[dict], audio_urls: list[str]) -> str:
     border-color: rgba(255,75,75,0.55);
   }}
   .ep-card.playing {{ border-color: rgba(255,75,75,0.55); }}
-  .err {{ color: #ff8a8a; font-size: 0.85em; }}
 </style>
 <div class="tab-content">
   {cards_html}
 </div>
-<script type="module">
-  // wavesurfer.js v7 ships ESM only (no UMD bundle).
-  import WaveSurfer from 'https://cdn.jsdelivr.net/npm/wavesurfer.js@7.8.6/dist/wavesurfer.esm.js';
+<script>
+  (function() {{
+    const audios = Array.from(document.querySelectorAll('audio.audio'));
 
-  const AUDIO_URLS = {audio_urls_js};
-  const players = [];
+    audios.forEach((audio, idx) => {{
+      const card = document.getElementById('ep-' + idx);
 
-  function fmt(s) {{
-    s = Math.floor(s || 0);
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return m + ':' + (sec < 10 ? '0' : '') + sec;
-  }}
+      // Pause all other audios when this one plays.
+      audio.addEventListener('play', () => {{
+        audios.forEach((a, i) => {{ if (i !== idx) a.pause(); }});
+        if (card) card.classList.add('playing');
+      }});
+      audio.addEventListener('pause', () => {{
+        if (card) card.classList.remove('playing');
+      }});
 
-  function pauseAllExcept(idx) {{
-    players.forEach((p, i) => {{ if (i !== idx && p) p.pause(); }});
-  }}
+      // Auto-play next episode when this one finishes.
+      audio.addEventListener('ended', () => {{
+        if (card) card.classList.remove('playing');
+        const next = audios[idx + 1];
+        if (next) {{
+          // Small delay so the transition is perceptible.
+          setTimeout(() => next.play().catch(() => {{ /* user-gesture limit */ }}), 600);
+          const nextCard = document.getElementById('ep-' + (idx + 1));
+          if (nextCard) nextCard.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+        }}
+      }});
 
-  function playEpisode(idx) {{
-    if (idx < 0 || idx >= players.length || !players[idx]) return;
-    pauseAllExcept(idx);
-    // Trigger the play button so lazy-load + autoplay-on-ready logic runs
-    const playBtn = document.getElementById('play-' + idx);
-    if (playBtn) playBtn.click();
-    const card = document.getElementById('ep-' + idx);
-    if (card) card.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
-  }}
-
-  AUDIO_URLS.forEach((url, idx) => {{
-    // Lazy: do NOT pass `url:` so wavesurfer doesn't fetch + decode 10-18MB
-    // of audio on page load. We call ws.load(url) on first play. That keeps
-    // 4 tabs × 5 cards from hammering the browser at once.
-    const ws = WaveSurfer.create({{
-      container: '#wave-' + idx,
-      waveColor: 'rgba(255,75,75,0.40)',
-      progressColor: '#FF4B4B',
-      cursorColor: '#FF4B4B',
-      height: 64,
-      barWidth: 2,
-      barGap: 1,
-      barRadius: 1,
-    }});
-    const btn = document.getElementById('play-' + idx);
-    const timeEl = document.getElementById('time-' + idx);
-    const card = document.getElementById('ep-' + idx);
-    let loaded = false;
-
-    btn.addEventListener('click', () => {{
-      if (!loaded) {{
-        timeEl.textContent = 'loading…';
-        ws.load(url);
-        loaded = true;
-        // Auto-play once wavesurfer signals it has enough data
-        ws.once('ready', () => {{
-          pauseAllExcept(idx);
-          ws.play();
+      // Per-card speed buttons; HTMLAudioElement.preservesPitch defaults true.
+      document.querySelectorAll('#ep-' + idx + ' .speed-btn').forEach((sb) => {{
+        sb.addEventListener('click', () => {{
+          const rate = parseFloat(sb.getAttribute('data-rate'));
+          audio.playbackRate = rate;
+          document.querySelectorAll('#ep-' + idx + ' .speed-btn')
+            .forEach((b) => b.classList.remove('active'));
+          sb.classList.add('active');
         }});
-      }} else if (ws.isPlaying()) {{
-        ws.pause();
-      }} else {{
-        playEpisode(idx);
-      }}
-    }});
-
-    // Wire up the speed buttons for THIS card. Default rate is 1x (natural).
-    // Second arg `true` = preserve pitch (no chipmunk effect).
-    document.querySelectorAll('.ep-card#ep-' + idx + ' .speed-btn').forEach((sb) => {{
-      sb.addEventListener('click', () => {{
-        const rate = parseFloat(sb.getAttribute('data-rate'));
-        ws.setPlaybackRate(rate, true);
-        document.querySelectorAll('.ep-card#ep-' + idx + ' .speed-btn')
-          .forEach((b) => b.classList.remove('active'));
-        sb.classList.add('active');
       }});
     }});
-
-    // Show loading state until ws is ready (replaces the static --:-- / --:--)
-    timeEl.textContent = 'loading…';
-
-    // Safety net: if the audio hasn't loaded after 15s, treat as failed and
-    // expose a retry button. This catches silent decode failures + dropped requests.
-    const readyTimeout = setTimeout(() => {{
-      if (!ws._npReady) {{
-        timeEl.innerHTML = '<span class="err">audio slow / failed</span> '
-          + '<button class="speed-btn" id="retry-' + idx + '">↻ reload</button>';
-        const retryBtn = document.getElementById('retry-' + idx);
-        if (retryBtn) retryBtn.addEventListener('click', () => location.reload());
-      }}
-    }}, 15000);
-
-    ws.on('ready', () => {{
-      ws._npReady = true;
-      clearTimeout(readyTimeout);
-      timeEl.textContent = '0:00 / ' + fmt(ws.getDuration());
-    }});
-    ws.on('play',  () => {{
-      btn.textContent = '⏸';
-      card.classList.add('playing');
-    }});
-    ws.on('pause', () => {{
-      btn.textContent = '▶';
-      card.classList.remove('playing');
-    }});
-    ws.on('finish', () => {{
-      btn.textContent = '▶';
-      ws.setTime(0);
-      card.classList.remove('playing');
-      if (idx + 1 < players.length) {{
-        setTimeout(() => playEpisode(idx + 1), 600);
-      }}
-    }});
-    ws.on('timeupdate', (t) => {{
-      timeEl.textContent = fmt(t) + ' / ' + fmt(ws.getDuration());
-    }});
-    ws.on('error', (e) => {{
-      clearTimeout(readyTimeout);
-      timeEl.innerHTML = '<span class="err">audio load failed</span> '
-        + '<button class="speed-btn" id="retry-' + idx + '">↻ reload</button>';
-      const retryBtn = document.getElementById('retry-' + idx);
-      if (retryBtn) retryBtn.addEventListener('click', () => location.reload());
-      console.error('wavesurfer error for', url, e);
-    }});
-
-    players.push(ws);
-  }});
+  }})();
 </script>
 """
 
